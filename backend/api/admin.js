@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db/db"); 
 const { authenticateAdmin } = require("../middleware/middleware");
+const nodemailer = require("nodemailer");
+require("dotenv").config()
+
 
 // Get all users
 router.get("/users", authenticateAdmin,  (req, res) => {
@@ -18,6 +21,14 @@ router.get("/users", authenticateAdmin,  (req, res) => {
   );
 });
 
+const transporter = nodemailer.createTransport({
+  service: "gmail", 
+  auth: {
+    user: process.env.ADMIN_EMAIL,
+    pass: process.env.ADMIN_PASS,
+  },
+});
+
 router.post("/update-status", authenticateAdmin, (req, res) => {
   const { useremail, status} = req.body 
   console.log(useremail); 
@@ -27,17 +38,29 @@ router.post("/update-status", authenticateAdmin, (req, res) => {
   }
   const placeholders = useremail.map(() => "?").join(","); // "?, ?, ?" idk what this is chat maybe ask rishi why ? nvm 
 
-  db.run(
-    `UPDATE users SET status = ? WHERE email IN (${placeholders})`, [status, ...useremail],
-    function (err) {
-      if (err) return res.status(500).json({ error: "DB error" });
+  db.all(`SELECT email, providerName FROM users WHERE email IN (${placeholders})`, useremail, (err, rows) => {
+    if (err) return res.status(500).json({ error: "DB Error" });
 
-      // this.changes = number of rows updated
-     return res.status(200).json({ message: `user(s) updated to` }); 
-      
+    db.run(`UPDATE users SET status = ? WHERE email IN (${placeholders})`, [status, ...useremail], function (err) {
+      if (err) return res.status(500).json({ error: "DB error updating status" });
+
+      if (status === "approved") {
+        rows.forEach(user => {
+          const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: user.email,
+            subject: "Your account has been approved",
+            text: `Hello ${user.providerName},\n\nYour account registration request has been approved. You can now log in to the system.\n\nBest,\nAdmin Team`
+          };
+          transporter.sendMail(mailOptions, (err, info) => {
+            if (err) console.error("Error Sending Email", user.email, err);
+          });
+        });
+      }
+      return res.status(200).json({ message: `Updated` });
     });
-    }
-);
+  });
+});
 
  
 module.exports = router;
