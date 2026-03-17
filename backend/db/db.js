@@ -73,19 +73,4 @@ bcrypt.hash(testing2Pass, 10, (err, hash) => {
   );
 });
 
-const testing3email = "testing3@gmail.com";
-const testing3Pass = "testing2"; 
-const testing3name = "testing2"; 
-
-bcrypt.hash(testing3Pass, 10, (err, hash) => {
-  if (err) throw err;
-
-  db.run(
-    `INSERT OR IGNORE INTO users (providerName, email, password, status, role) VALUES (?, ?, ?, ?, ?)`,
-    [testing3name, testing3email,hash, "approved", "user"],
-    (err) => {
-      if (err) console.error("Error inserting admin:", err);
-    }
-  );
-});
 module.exports = db;
