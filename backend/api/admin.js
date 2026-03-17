@@ -4,7 +4,7 @@ const db = require("../db/db");
 const { authenticateAdmin } = require("../middleware/middleware");
 
 // Get all users
-router.get("/users", authenticateAdmin, (req, res) => {
+router.get("/users", authenticateAdmin,  (req, res) => {
 
   db.all(
     `SELECT id, providerName, email, status FROM users WHERE role='user'`,

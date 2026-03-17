@@ -33,6 +33,9 @@ app.use('/api/validate', validate);
 const accessUsers = require('./api/admin');
 app.use('/api/admin', accessUsers);
 
+
+const emailVerify = require('./verify/emailverify');
+app.use('/verify/emailverify', emailVerify);
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
