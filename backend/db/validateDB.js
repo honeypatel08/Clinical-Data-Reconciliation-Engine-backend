@@ -1,7 +1,7 @@
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 
-const historyDB = new sqlite3.Database(path.resolve(__dirname, "reconcile.db"), (err) => {
+const validateHistoryDB = new sqlite3.Database(path.resolve(__dirname, "validateDB.db"), (err) => {
   if (err) {
     console.error("DB connection error:", err);
   } else {
@@ -9,18 +9,16 @@ const historyDB = new sqlite3.Database(path.resolve(__dirname, "reconcile.db"), 
   }
 });
 
-historyDB.run(`
-        CREATE TABLE IF NOT EXISTS approvals (
+validateHistoryDB.run(`
+        CREATE TABLE IF NOT EXISTS Validateapprovals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL,
-        reconciled_medication TEXT NOT NULL,
-        confidence_score REAL,
-        reasoning TEXT,
-        recommended_actions TEXT,
-        clinical_safety_check TEXT,
+        overall_score INTEGER,
+        breakdown TEXT,
+        issues_detected TEXT,
         status TEXT DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
 `);
 
-module.exports = historyDB;
+module.exports = validateHistoryDB;

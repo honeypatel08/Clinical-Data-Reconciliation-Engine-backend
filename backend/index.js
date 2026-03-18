@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require("cors");
 const db = require("./db/db")
-const historyDB = require("./db/reconcileDB")
 const jwt = require("jsonwebtoken");
 
 require("dotenv").config();
@@ -41,6 +40,7 @@ app.use('/user/approves',approveReconcile);
 const emailVerify = require('./verify/emailverify');
 app.use('/verify/emailverify', emailVerify);
 
+// user bt frontednd to secure home page, so even dev tool to change role, token is unchangable 
 app.post('/user-role', (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Unauthorized" });

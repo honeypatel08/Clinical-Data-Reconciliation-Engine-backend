@@ -2,27 +2,81 @@ const express = require("express");
 const router = express.Router();
 const { generateClinicalReasoning } = require("../AI/gemini");
 const { authenticateUser } = require("../middleware/middleware");
+const { checkRateLimit } = require("../utils/rateLimiter");
+const crypto = require("crypto");
+const db = require("../db/db"); 
 
+// generate a hash of payload input in body 
+function hashPayload(payload) {
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
 router.post("/data-quality", authenticateUser,  async (req, res) => {
     try{
+        const userId = req.user.id;
+        const rate = checkRateLimit(userId, 30000);
+        if (!rate.allowed) {
+        return res.status(429).json({
+            error: `Rate limit exceeded. Try again in ${rate.retryAfter}s`
+        });
+        }
         const data = req.body;
         const prompt = buildPrompt(data);
-        const aiReply = await generateClinicalReasoning(prompt);
-        const formated = aiReply.replace(/```json|```/g, "").trim();
+        const inputHash = hashPayload(data);
+    
+        db.get('SELECT output FROM ai_cache WHERE input = ?', [inputHash], async (err, row) => {
+        if (err) {
+            console.error("DB error:", err);
+            return res.status(500).json({ error: "Error" });
+        }
 
-        let parsed;
+        if (row) {
+            console.log("Cache hit");
+            try {
+            const cachedOutput = JSON.parse(row.output);
+            return res.json(cachedOutput);
+            } catch (e) {
+            console.error("Cache parse error:", e);
+            }
+        }
+
+        //c ache miss 
         try {
-            parsed = JSON.parse(formated);
-        } catch (e) {
+            console.log("Cache miss");
+            const aiReply = await generateClinicalReasoning(prompt);
+            const formatted = aiReply.replace(/```json|```/g, "").trim();
+            let parsed;
+            try {
+                parsed = JSON.parse(formatted);
+            } catch (e) {
             return res.status(500).json({
                 error: "Invalid AI response format",
                 raw: aiReply
             });
-        }
-        res.json(parsed);
+            }
+
+            db.run( 'INSERT OR REPLACE INTO ai_cache (input, output, created_at) VALUES (?, ?, ?)', [inputHash, JSON.stringify(parsed), Date.now()],
+            (err) => {
+                if (err) console.error("Cache insert error:", err);
+            }
+            );
+            res.json(parsed);
+        } catch (aiErr) {
+            console.error("AI call error:", aiErr);
+            if (aiErr.type === "RATE_LIMIT") {
+                if (row) {
+                    return res.json(JSON.parse(row.output));
+                }
+
+                return res.status(429).json({
+                    error: "AI limit hit, try again later after 24 hrs. "
+                });
+            }
+                res.status(500).json({ error: "AI processing failed" });
+            }
+        });
     } catch (err) {
-        res.status(500).json({ error: "Data-Quality failed"
-    });
+        console.error(err);
+        res.status(500).json({ error: "Validate failed" });
     }
 });
 

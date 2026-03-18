@@ -21,6 +21,30 @@ db.run(`
   )
 `);
 
+// to store each user history for reconclie
+db.run(`
+        CREATE TABLE IF NOT EXISTS approvals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        reconciled_medication TEXT NOT NULL,
+        confidence_score REAL,
+        reasoning TEXT,
+        recommended_actions TEXT,
+        clinical_safety_check TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+`);
+
+// for cache
+db.run(`
+        CREATE TABLE IF NOT EXISTS ai_cache (
+        input TEXT PRIMARY KEY,
+        output TEXT,
+        created_at INTEGER
+    )
+`);
+ 
 // Define Admin and only one and that to here only  
 const adminEmail = "clinicalsystemadmin@gmail.com";
 const adminPassword = "adminAccess070805"; 
