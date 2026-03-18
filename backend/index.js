@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require("cors");
 const db = require("./db/db")
 const historyDB = require("./db/reconcileDB")
+const jwt = require("jsonwebtoken");
 
 require("dotenv").config();
 const app = express();
@@ -39,6 +40,17 @@ app.use('/user/approves',approveReconcile);
 
 const emailVerify = require('./verify/emailverify');
 app.use('/verify/emailverify', emailVerify);
+
+app.post('/user-role', (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ error: "Forbidden" });
+    const role = decoded.role;
+    res.json({ role });
+  });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

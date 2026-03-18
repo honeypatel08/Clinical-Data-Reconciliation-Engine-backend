@@ -2,10 +2,19 @@ const express = require("express");
 const router = express.Router();
 const { generateClinicalReasoning } = require("../AI/gemini");
 const { authenticateUser } = require("../middleware/middleware");
+const { checkRateLimit } = require("../utils/rateLimiter");
 
 
-router.post("/medication", async (req, res) => {
+router.post("/medication", authenticateUser, async (req, res) => {
   try {
+    const userId = req.user.id;
+    const rate = checkRateLimit(userId, 30000);
+    if (!rate.allowed) {
+      return res.status(429).json({
+        error: `Rate limit exceeded. Try again in ${rate.retryAfter}s`
+      });
+    }
+
     const data = req.body;
     const prompt = buildPrompt(data);
     const aiReply = await generateClinicalReasoning(prompt);
