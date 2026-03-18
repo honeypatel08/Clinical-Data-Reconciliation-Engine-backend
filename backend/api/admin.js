@@ -47,7 +47,7 @@ router.post("/update-status", authenticateAdmin, (req, res) => {
       if (status === "approved") {
         rows.forEach(user => {
           const mailOptions = {
-            from: process.env.EMAIL_USER,
+            from: process.env.ADMIN_EMAIL,
             to: user.email,
             subject: "Your account has been approved",
             text: `Hello ${user.providerName},\n\nYour account registration request has been approved. You can now log in to the system.\n\nBest,\nAdmin Team`
