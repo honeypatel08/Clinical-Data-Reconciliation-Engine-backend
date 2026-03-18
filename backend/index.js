@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require("cors");
 const db = require("./db/db")
+const historyDB = require("./db/reconcileDB")
 
 require("dotenv").config();
 const app = express();
@@ -33,6 +34,8 @@ app.use('/api/validate', validate);
 const accessUsers = require('./api/admin');
 app.use('/api/admin', accessUsers);
 
+const approveReconcile = require('./user/approves');
+app.use('/user/approves',approveReconcile); 
 
 const emailVerify = require('./verify/emailverify');
 app.use('/verify/emailverify', emailVerify);
