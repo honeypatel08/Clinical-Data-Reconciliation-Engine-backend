@@ -1,84 +1,16 @@
+// validate.js
 const express = require("express"); 
 const router = express.Router();
 const { generateClinicalReasoning } = require("../AI/gemini");
 const { authenticateUser } = require("../middleware/middleware");
 const { checkRateLimit } = require("../utils/rateLimiter");
 const crypto = require("crypto");
-const db = require("../db/db"); 
+const pool = require("../db/db"); // PostgreSQL Pool
 
 // generate a hash of payload input in body 
 function hashPayload(payload) {
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
-router.post("/data-quality", authenticateUser,  async (req, res) => {
-    try{
-        const userId = req.user.id;
-        const rate = checkRateLimit(userId, 30000);
-        if (!rate.allowed) {
-        return res.status(429).json({
-            error: `Rate limit exceeded. Try again in ${rate.retryAfter}s`
-        });
-        }
-        const data = req.body;
-        const prompt = buildPrompt(data);
-        const inputHash = hashPayload(data);
-    
-        db.get('SELECT output FROM ai_cache WHERE input = ?', [inputHash], async (err, row) => {
-        if (err) {
-            console.error("DB error:", err);
-            return res.status(500).json({ error: "Error" });
-        }
-
-        if (row) {
-            console.log("Cache hit");
-            try {
-            const cachedOutput = JSON.parse(row.output);
-            return res.json(cachedOutput);
-            } catch (e) {
-            console.error("Cache parse error:", e);
-            }
-        }
-
-        //c ache miss 
-        try {
-            console.log("Cache miss");
-            const aiReply = await generateClinicalReasoning(prompt);
-            const formatted = aiReply.replace(/```json|```/g, "").trim();
-            let parsed;
-            try {
-                parsed = JSON.parse(formatted);
-            } catch (e) {
-            return res.status(500).json({
-                error: "Invalid AI response format",
-                raw: aiReply
-            });
-            }
-
-            db.run( 'INSERT OR REPLACE INTO ai_cache (input, output, created_at) VALUES (?, ?, ?)', [inputHash, JSON.stringify(parsed), Date.now()],
-            (err) => {
-                if (err) console.error("Cache insert error:", err);
-            }
-            );
-            res.json(parsed);
-        } catch (aiErr) {
-            console.error("AI call error:", aiErr);
-            if (aiErr.type === "RATE_LIMIT") {
-                if (row) {
-                    return res.json(JSON.parse(row.output));
-                }
-
-                return res.status(429).json({
-                    error: "AI limit hit, try again later after 24 hrs. "
-                });
-            }
-                res.status(500).json({ error: "AI processing failed" });
-            }
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Validate failed" });
-    }
-});
 
 function buildPrompt(data) {
   return `
@@ -96,20 +28,20 @@ function buildPrompt(data) {
     Return ONLY valid JSON. No markdown. No explanation.
     Format:
     {
-    "overall_score": number (0-100),
-    "breakdown": {
+      "overall_score": number (0-100),
+      "breakdown": {
         "completeness": number (0-100),
         "accuracy": number (0-100),
         "timeliness": number (0-100),
         "clinical_plausibility": number (0-100)
-    },
-    "issues_detected": [
+      },
+      "issues_detected": [
         {
-        "field": "field_name",
-        "issue": "description",
-        "severity": "low | medium | high"
+          "field": "field_name",
+          "issue": "description",
+          "severity": "low | medium | high"
         }
-    ]
+      ]
     }
     Scoring Guidelines:
     - Start from 100 and deduct for each issue
@@ -124,7 +56,77 @@ function buildPrompt(data) {
     - Heart rate < 60 or > 100 = abnormal
     - Ensure values make medical sense
     Patient Record:
-    ${JSON.stringify(data, null, 2)}`;
+    ${JSON.stringify(data, null, 2)}
+  `;
 }
+
+router.post("/data-quality", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const rate = checkRateLimit(userId, 30000);
+    if (!rate.allowed) {
+      return res.status(429).json({
+        error: `Rate limit exceeded. Try again in ${rate.retryAfter}s`
+      });
+    }
+
+    const data = req.body;
+    const prompt = buildPrompt(data);
+    const inputHash = hashPayload(data);
+
+    // Check cache in PostgreSQL
+    const cacheResult = await pool.query(
+      'SELECT output FROM ai_cache WHERE input = $1',
+      [inputHash]
+    );
+
+    if (cacheResult.rows.length > 0) {
+      console.log("Cache hit");
+      try {
+        const cachedOutput = JSON.parse(cacheResult.rows[0].output);
+        return res.json(cachedOutput);
+      } catch (e) {
+        console.error("Cache parse error:", e);
+      }
+    }
+
+    // Cache miss
+    console.log("Cache miss");
+    const aiReply = await generateClinicalReasoning(prompt);
+    const formatted = aiReply.replace(/```json|```/g, "").trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(formatted);
+    } catch (e) {
+      return res.status(500).json({
+        error: "Invalid AI response format",
+        raw: aiReply
+      });
+    }
+
+    // Upsert cache into PostgreSQL
+    await pool.query(
+      `INSERT INTO ai_cache (input, output, created_at)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (input) DO UPDATE 
+       SET output = EXCLUDED.output, created_at = EXCLUDED.created_at`,
+      [inputHash, JSON.stringify(parsed), Date.now()]
+    );
+
+    res.json(parsed);
+
+  } catch (err) {
+    console.error("Validation error:", err);
+
+    if (err.type === "RATE_LIMIT") {
+      return res.status(429).json({
+        error: "AI limit hit, try again later after 24 hrs."
+      });
+    }
+
+    res.status(500).json({ error: "Validate failed" });
+  }
+});
 
 module.exports = router;

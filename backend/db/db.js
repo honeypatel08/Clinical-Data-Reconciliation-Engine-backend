@@ -1,51 +1,31 @@
-// const sqlite3 = require("sqlite3").verbose();
-// const db = new sqlite3.Database(process.env.DB_PATH || './users.db');
-
-// const path = require("path");
-// const bcrypt = require("bcrypt");
-// require("dotenv").config();
-
 // db.js
-const fs = require("fs");
-const https = require("https");
-const sqlite3 = require("sqlite3").verbose();
+const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
+require("dotenv").config();
 
-const DB_PATH = "./users.db";
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // Railway sets this in ENV
+});
 
-// Download DB from GitHub if it doesn't exist
-if (!fs.existsSync(DB_PATH)) {
-  const file = fs.createWriteStream(DB_PATH);
-  https.get(
-    "https://raw.githubusercontent.com/honeypatel08/yourrepo/Clinical-Data-Reconciliation-Engine-backend/db/users.db", // <--- Replace with your raw GitHub URL
-    (response) => {
-      response.pipe(file);
-      file.on("finish", () => {
-        file.close();
-        console.log("Downloaded users.db from GitHub");
-      });
-    }
-  );
-}
+// --- Table creation ---
+async function createTables() {
+  try {
+    // Users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        providerName TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        role TEXT NOT NULL DEFAULT 'user'
+      )
+    `);
 
-const db = new sqlite3.Database(DB_PATH);
-
-
-db.serialize(() => {
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    providerName TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
-    role TEXT NOT NULL DEFAULT 'user'
-  )
-`);
-
-// to store each user history for reconclie
-db.run(`
-        CREATE TABLE IF NOT EXISTS approvals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    // Approvals table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS approvals (
+        id SERIAL PRIMARY KEY,
         email TEXT NOT NULL,
         reconciled_medication TEXT NOT NULL,
         confidence_score REAL,
@@ -54,69 +34,68 @@ db.run(`
         clinical_safety_check TEXT,
         status TEXT DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-`);
+      )
+    `);
 
-// for cache
-db.run(`
-        CREATE TABLE IF NOT EXISTS ai_cache (
+    // AI cache table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_cache (
         input TEXT PRIMARY KEY,
         output TEXT,
-        created_at INTEGER
-    )
-`);
-});
- 
-// Define Admin and only one and that to here only  
-const adminEmail = process.env.ADMIN_EMAIL;
-const adminPassword = process.env.ADMIN_PASSWORD; 
-const adminName = "Admin"; 
+        created_at BIGINT
+      )
+    `);
 
-bcrypt.hash(adminPassword, 10, (err, hash) => {
-  if (err) throw err;
+    console.log("All tables created or exist already");
+  } catch (err) {
+    console.error("Error creating tables:", err);
+  }
+}
 
-  db.run(
-    `INSERT OR IGNORE INTO users (providerName, email, password, status, role) VALUES (?, ?, ?, ?, ?)`,
-    [adminName, adminEmail, hash, "approved", "admin"],
-    (err) => {
-      if (err) console.error("Error inserting admin:", err);
-      else console.log("Predefined admin inserted");
+// --- Predefined admin and test users ---
+async function insertDefaultUsers() {
+  try {
+    // Admin
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminName = "Admin";
+    const adminHash = await bcrypt.hash(adminPassword, 10);
+
+    await pool.query(
+      `INSERT INTO users (providerName, email, password, status, role)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (email) DO NOTHING`,
+      [adminName, adminEmail, adminHash, "approved", "admin"]
+    );
+
+    console.log("Predefined admin inserted (if not exists)");
+
+    // Test users
+    const testUsers = [
+      { name: "testing1", email: "testing1@gmail.com", pass: "testing1", status: "approved" },
+      { name: "testing2", email: "testing2@gmail.com", pass: "testing2", status: "rejected" },
+    ];
+
+    for (const u of testUsers) {
+      const hash = await bcrypt.hash(u.pass, 10);
+      await pool.query(
+        `INSERT INTO users (providerName, email, password, status, role)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (email) DO NOTHING`,
+        [u.name, u.email, hash, u.status, "user"]
+      );
     }
-  );
-});
 
+    console.log("Test users inserted (if not exists)");
+  } catch (err) {
+    console.error("Error inserting default users:", err);
+  }
+}
 
-// all test DELETE LATER ;}
-const testing1email = "testing1@gmail.com";
-const testing1Pass = "testing1"; 
-const testing1name = "testing1"; 
+// Run table creation and default inserts
+(async () => {
+  await createTables();
+  await insertDefaultUsers();
+})();
 
-bcrypt.hash(testing1Pass, 10, (err, hash) => {
-  if (err) throw err;
-
-  db.run(
-    `INSERT OR IGNORE INTO users (providerName, email, password, status, role) VALUES (?, ?, ?, ?, ?)`,
-    [testing1name, testing1email, hash, "approved", "user"],
-    (err) => {
-      if (err) console.error("Error inserting admin:", err);
-    }
-  );
-});
-
-const testing2email = "testing2@gmail.com";
-const testing2Pass = "testing2"; 
-const testing2name = "testing2"; 
-
-bcrypt.hash(testing2Pass, 10, (err, hash) => {
-  if (err) throw err;
-
-  db.run(
-    `INSERT OR IGNORE INTO users (providerName, email, password, status, role) VALUES (?, ?, ?, ?, ?)`,
-    [testing2name, testing2email, hash, "rejected", "user"],  // correct order & hashed password
-    (err) => {
-      if (err) console.error("Error inserting user:", err);
-    }
-  );
-});
-
-module.exports = db;
+module.exports = pool;
