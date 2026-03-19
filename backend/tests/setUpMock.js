@@ -1,21 +1,27 @@
-// Mock AI module
+// AI module
 jest.mock('../AI/gemini', () => ({
-  generateClinicalReasoning: jest.fn(() => Promise.resolve(JSON.stringify({
-    reconciled_medication: "Metformin 500mg twice daily",
-    confidence_score: 0.88,
-    reasoning: "Mocked AI reasoning",
-    recommended_actions: ["Verify prescription with clinician"],
-    clinical_safety_check: "PASSED"
-  })))
+  generateClinicalReasoning: jest.fn(() =>
+    Promise.resolve(JSON.stringify({
+      reconciled_medication: "Metformin 500mg twice daily",
+      confidence_score: 0.88,
+      reasoning: "Mocked AI reasoning",
+      recommended_actions: ["Verify prescription with clinician"],
+      clinical_safety_check: "PASSED"
+    }))
+  )
 }));
 
-// Mock DB module
+// PostgreSQL pool
 jest.mock('../db/db', () => ({
-  get: jest.fn((query, params, cb) => cb(null, null)), // default cache miss
-  run: jest.fn((query, params, cb) => cb(null))
+  query: jest.fn((text, params) => {
+    if (text.includes('FROM ai_cache')) {
+      return Promise.resolve({ rows: [] });
+    }
+    return Promise.resolve({ rowCount: 1, rows: [] });
+  })
 }));
 
-// Mock auth middleware
+// auth middleware
 jest.mock('../middleware/middleware', () => ({
   authenticateUser: (req, res, next) => {
     req.user = { id: "testUser" };
@@ -23,7 +29,7 @@ jest.mock('../middleware/middleware', () => ({
   }
 }));
 
-// Mock rate limiter
+//rate limiter
 jest.mock('../utils/rateLimiter', () => ({
   checkRateLimit: jest.fn(() => ({ allowed: true }))
 }));

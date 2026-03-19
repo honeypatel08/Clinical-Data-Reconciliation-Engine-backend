@@ -33,14 +33,21 @@ describe("/api/reconcile/medication endpoint", () => {
   test("2. Reconciliation with cache hit", async () => {
     const db = require('../db/db');
     // simulate cache hit
-    db.get.mockImplementationOnce((query, params, cb) => {
-      cb(null, { output: JSON.stringify({
-        reconciled_medication: "CachedMed 50mg",
-        confidence_score: 0.9,
-        reasoning: "Cached reasoning",
-        recommended_actions: [],
-        clinical_safety_check: "PASSED"
-      }) });
+    db.query.mockImplementationOnce((text, params) => {
+      if (text.includes('FROM ai_cache')) {
+        return Promise.resolve({
+          rows: [{
+            output: JSON.stringify({
+              reconciled_medication: "CachedMed 50mg",
+              confidence_score: 0.9,
+              reasoning: "Cached reasoning",
+              recommended_actions: [],
+              clinical_safety_check: "PASSED"
+            })
+          }]
+        });
+      }
+      return Promise.resolve({ rows: [] });
     });
 
     const input = { patient_context: {}, sources: [{ system: "Clinic", medication: "Lisinopril 20mg", source_reliability: "high" }] };
