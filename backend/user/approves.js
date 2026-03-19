@@ -65,4 +65,45 @@ router.get("/history", async (req, res) => {
   }
 });
 
+router.post("/data-quality", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ success: false, message: "No token" });
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const email = decoded.email;
+    const { overall_score, breakdown, issues_detected } = req.body;
+
+    await pool.query(
+      `INSERT INTO data_quality_approvals (email, overall_score, breakdown, issues_detected, status)
+       VALUES ($1, $2, $3, $4, 'approved')`,
+      [
+        email,
+        overall_score,
+        JSON.stringify(breakdown),
+        JSON.stringify(issues_detected)
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Data Quality Approve error:", err);
+    res.status(401).json({ success: false });
+  }
+});
+
+router.get("/data-quality/history", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    const email = decoded.email;
+
+    const result = await pool.query(
+      `SELECT overall_score, breakdown, issues_detected, created_at FROM data_quality_approvals
+       WHERE email = $1 AND status = 'approved' ORDER BY created_at DESC`, [email]
+    );
+    res.json({ approved: result.rows });
+  } catch (err) {
+    res.status(401).json({ success: false });
+  }
+});
+
 module.exports = router;

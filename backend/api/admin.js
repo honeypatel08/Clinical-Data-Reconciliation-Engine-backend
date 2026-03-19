@@ -1,4 +1,3 @@
-// admin.js
 const express = require("express");
 const router = express.Router();
 const pool = require("../db/db");
@@ -47,7 +46,6 @@ router.post("/update-status", authenticateAdmin, async (req, res) => {
     const fetchResult = await pool.query(queryFetch, [useremail]);
     const users = fetchResult.rows;
 
-    // Update statuses
     const queryUpdate = `UPDATE users SET status = $1 WHERE email = ANY($2)`;
     await pool.query(queryUpdate, [status, useremail]);
 

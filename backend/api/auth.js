@@ -5,11 +5,10 @@ const bcrypt = require("bcrypt");
 const pool = require("../db/db"); 
 const jwt = require("jsonwebtoken");
 
-// Log in
+
 router.post("/log-in", async (req, res) => {
   const { email, password } = req.body;
   console.log("Received log in: ", req.body);
-
   if (!email || !password) {
     return res.status(400).json({ error: "Missing Login information!" });
   }
@@ -38,7 +37,7 @@ router.post("/log-in", async (req, res) => {
     const token = jwt.sign(
       { email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" } // optional: token expires in 1 day
+      { expiresIn: "1d" }
     );
 
     res.json({
@@ -52,7 +51,7 @@ router.post("/log-in", async (req, res) => {
   }
 });
 
-// Register user
+
 router.post("/register", async (req, res) => {
   const { providerName, email, password } = req.body;
   console.log("Received body:", req.body);
@@ -65,7 +64,6 @@ router.post("/register", async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-
     await pool.query(
       `INSERT INTO users (providerName, email, password)
        VALUES ($1, $2, $3)`,

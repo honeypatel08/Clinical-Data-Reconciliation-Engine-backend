@@ -24,7 +24,6 @@ function buildPrompt(data) {
       - source reliability
       - patient conditions
       - lab values (especially kidney function)
-
     Return STRICT JSON:
     {
       "reconciled_medication": "...",
@@ -33,10 +32,8 @@ function buildPrompt(data) {
       "recommended_actions": [],
       "clinical_safety_check": "PASSED or FAILED"
     }
-
     Patient Context:
     ${JSON.stringify(data.patient_context, null, 2)}
-
     Sources:
     ${JSON.stringify(data.sources, null, 2)}
   `;
@@ -101,7 +98,6 @@ router.post("/medication", authenticateUser, async (req, res) => {
   } catch (err) {
     console.error("Reconciliation error:", err);
 
-    // Handle AI rate limit separately
     if (err.type === "RATE_LIMIT") {
       return res.status(429).json({
         error: "AI limit hit, try again later after 24 hrs."

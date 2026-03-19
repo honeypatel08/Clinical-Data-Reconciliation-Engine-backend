@@ -7,7 +7,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL, // Railway sets this in ENV
 });
 
-// --- Table creation ---
 async function createTables() {
   try {
     // Users table
@@ -46,13 +45,23 @@ async function createTables() {
       )
     `);
 
-    console.log("All tables created or exist already");
+     await pool.query(`
+      CREATE TABLE IF NOT EXISTS data_quality_approvals (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        overall_score INT,
+        breakdown JSONB,          
+        issues_detected JSONB,   
+        status TEXT DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
   } catch (err) {
     console.error("Error creating tables:", err);
   }
 }
 
-// --- Predefined admin and test users ---
 async function insertDefaultUsers() {
   try {
     // Admin
@@ -68,9 +77,6 @@ async function insertDefaultUsers() {
       [adminName, adminEmail, adminHash, "approved", "admin"]
     );
 
-    console.log("Predefined admin inserted (if not exists)");
-
-    // Test users
     const testUsers = [
       { name: "testing1", email: "testing1@gmail.com", pass: "testing1", status: "approved" },
       { name: "testing2", email: "testing2@gmail.com", pass: "testing2", status: "rejected" },
@@ -86,13 +92,11 @@ async function insertDefaultUsers() {
       );
     }
 
-    console.log("Test users inserted (if not exists)");
   } catch (err) {
     console.error("Error inserting default users:", err);
   }
 }
 
-// Run table creation and default inserts
 (async () => {
   await createTables();
   await insertDefaultUsers();
