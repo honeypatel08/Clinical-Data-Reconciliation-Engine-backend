@@ -51,6 +51,10 @@ app.post('/user-role', (req, res) => {
   });
 });
 
+app.get("/ping",(req,res)=>{
+  res.json("pong")
+})
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
