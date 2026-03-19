@@ -1,15 +1,12 @@
 const sqlite3 = require("sqlite3").verbose();
+const db = new sqlite3.Database(process.env.DB_PATH || './users.db');
+
 const path = require("path");
 const bcrypt = require("bcrypt");
+require("dotenv").config();
 
-const db = new sqlite3.Database(path.resolve(__dirname, "users.db"), (err) => {
-  if (err) {
-    console.error("DB connection error:", err);
-  } else {
-    console.log("Connected to SQLite database");
-  }
-});
 
+db.serialize(() => {
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,10 +41,11 @@ db.run(`
         created_at INTEGER
     )
 `);
+});
  
 // Define Admin and only one and that to here only  
-const adminEmail = "clinicalsystemadmin@gmail.com";
-const adminPassword = "adminAccess070805"; 
+const adminEmail = process.env.ADMIN_EMAIL;
+const adminPassword = process.env.ADMIN_PASSWORD; 
 const adminName = "Admin"; 
 
 bcrypt.hash(adminPassword, 10, (err, hash) => {

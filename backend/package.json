@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
+    "install": "npm install --build-from-source sqlite3",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
