@@ -37,9 +37,6 @@ app.use('/api/admin', accessUsers);
 const approveReconcile = require('./user/approves');
 app.use('/user/approves',approveReconcile); 
 
-const emailVerify = require('./verify/emailverify');
-app.use('/verify/emailverify', emailVerify);
-
 // user bt frontednd to secure home page, so even dev tool to change role, token is unchangable 
 app.post('/user-role', (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
