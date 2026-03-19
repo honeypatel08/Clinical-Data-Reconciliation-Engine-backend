@@ -1,9 +1,33 @@
-const sqlite3 = require("sqlite3").verbose();
-const db = new sqlite3.Database(process.env.DB_PATH || './users.db');
+// const sqlite3 = require("sqlite3").verbose();
+// const db = new sqlite3.Database(process.env.DB_PATH || './users.db');
 
-const path = require("path");
-const bcrypt = require("bcrypt");
-require("dotenv").config();
+// const path = require("path");
+// const bcrypt = require("bcrypt");
+// require("dotenv").config();
+
+// db.js
+const fs = require("fs");
+const https = require("https");
+const sqlite3 = require("sqlite3").verbose();
+
+const DB_PATH = "./users.db";
+
+// Download DB from GitHub if it doesn't exist
+if (!fs.existsSync(DB_PATH)) {
+  const file = fs.createWriteStream(DB_PATH);
+  https.get(
+    "https://raw.githubusercontent.com/honeypatel08/yourrepo/Clinical-Data-Reconciliation-Engine-backend/db/users.db", // <--- Replace with your raw GitHub URL
+    (response) => {
+      response.pipe(file);
+      file.on("finish", () => {
+        file.close();
+        console.log("Downloaded users.db from GitHub");
+      });
+    }
+  );
+}
+
+const db = new sqlite3.Database(DB_PATH);
 
 
 db.serialize(() => {
