@@ -1,6 +1,6 @@
 # Clinical-Data-Reconciliation-Engine-backend
 
-Note: Project has been deployed. You can test the live version here: https://honeypatel08.github.io/Clinical-Data-Reconciliation-Engine_frontend/#/
+Note: Project has been deployed on railway. You can test the live version here: https://honeypatel08.github.io/Clinical-Data-Reconciliation-Engine_frontend/#/
 
 Local Run:
 1. Clone repository
