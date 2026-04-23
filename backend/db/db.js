@@ -4,7 +4,10 @@ const bcrypt = require("bcrypt");
 require("dotenv").config();
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // Railway sets this in ENV
+  connectionString: process.env.DATABASE_URL, // Render sets this in ENV
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 async function createTables() {
