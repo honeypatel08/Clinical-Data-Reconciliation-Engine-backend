@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/db");
 const { authenticateAdmin } = require("../middleware/middleware");
+const { sendAccountStatusEmail } = require("../services/email");
 require("dotenv").config();
 
 // Get all users
@@ -29,6 +30,9 @@ router.post("/update-status", authenticateAdmin, async (req, res) => {
   if (!useremail || !status || !Array.isArray(useremail) || useremail.length === 0) {
     return res.status(400).json({ error: "No users selected or invalid status" });
   }
+  if (!["approved", "rejected"].includes(status)) {
+    return res.status(400).json({ error: "Status must be approved or rejected" });
+  }
 
   try {
     const queryFetch = `SELECT email, providerName FROM users WHERE email = ANY($1)`;
@@ -39,8 +43,29 @@ router.post("/update-status", authenticateAdmin, async (req, res) => {
     const queryUpdate = `UPDATE users SET status = $1 WHERE email = ANY($2)`;
     await pool.query(queryUpdate, [status, useremail]);
 
+    const emailResults = await Promise.allSettled(
+      users.map((user) => sendAccountStatusEmail({
+        email: user.email,
+        providerName: user.providername,
+        status,
+      }))
+    );
+    const emailFailures = emailResults
+      .map((result, index) => ({ result, user: users[index] }))
+      .filter(({ result }) => result.status === "rejected")
+      .map(({ result, user }) => {
+        console.error(`Account ${status} email failed for ${user.email}:`, result.reason.message);
+        return { email: user.email, error: result.reason.message };
+      });
 
-    res.status(200).json({ message: "User status updated successfully" });
+    res.status(200).json({
+      message: "User status updated successfully",
+      email: {
+        sent: users.length - emailFailures.length,
+        failed: emailFailures.length,
+        failures: emailFailures,
+      },
+    });
   } catch (err) {
     console.error("Error updating status:", err);
     res.status(500).json({ error: "DB error updating status" });

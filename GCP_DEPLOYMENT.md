@@ -6,6 +6,7 @@ This project uses the following hosted components:
 - Cloud Run for the Node.js API
 - Cloud SQL for PostgreSQL
 - Secret Manager for passwords, the JWT signing secret, and the Gemini API key
+- Resend for account approval and rejection emails
 
 Cloud SQL is the persistent database. The backend creates its tables and initial admin user automatically when it starts. Creating a Cloud SQL instance, database, and database user is still required before deploying the API.
 
@@ -97,6 +98,7 @@ In **Security > Secret Manager**, create these secrets:
 | `clinical-jwt-secret` | Long random JWT signing value |
 | `clinical-gemini-key` | Gemini API key |
 | `clinical-admin-password` | Password for the application admin |
+| `clinical-resend-key` | Resend API key used only by the backend |
 
 Generate a JWT secret locally with `openssl rand -base64 48`.
 
@@ -137,8 +139,8 @@ gcloud run deploy clinical-reconciliation-api \
   --allow-unauthenticated \
   --service-account clinical-run@your-project-id.iam.gserviceaccount.com \
   --add-cloudsql-instances your-project-id:us-east1:clinical-db \
-  --set-env-vars INSTANCE_CONNECTION_NAME=your-project-id:us-east1:clinical-db,DB_USER=clinical_user,DB_NAME=clinical_app,DB_POOL_SIZE=5,ADMIN_EMAIL=admin@example.com,CORS_ORIGIN=https://honeypatel08.github.io,GEMINI_MODEL=gemini-3.8-flash \
-  --set-secrets DB_PASSWORD=clinical-db-password:latest,JWT_SECRET=clinical-jwt-secret:latest,GEMINI_API_KEY=clinical-gemini-key:latest,ADMIN_PASSWORD=clinical-admin-password:latest \
+  --set-env-vars INSTANCE_CONNECTION_NAME=your-project-id:us-east1:clinical-db,DB_USER=clinical_user,DB_NAME=clinical_app,DB_POOL_SIZE=5,ADMIN_EMAIL=admin@example.com,CORS_ORIGIN=https://honeypatel08.github.io,GEMINI_MODEL=gemini-3.8-flash,RESEND_FROM='Clinical System <onboarding@resend.dev>',RESEND_REPLY_TO=clinicalsystemadmin@gmail.com \
+  --set-secrets DB_PASSWORD=clinical-db-password:latest,JWT_SECRET=clinical-jwt-secret:latest,GEMINI_API_KEY=clinical-gemini-key:latest,ADMIN_PASSWORD=clinical-admin-password:latest,RESEND_API_KEY=clinical-resend-key:latest \
   --memory 512Mi \
   --min-instances 0 \
   --max-instances 2 \
@@ -146,6 +148,8 @@ gcloud run deploy clinical-reconciliation-api \
 ```
 
 Copy the Cloud Run URL printed after deployment.
+
+The `onboarding@resend.dev` sender is intended for testing and normally sends only to the email associated with the Resend account. Verify a domain in Resend and change `RESEND_FROM` before sending account notifications to arbitrary users.
 
 ## 7. Verify the API and database
 
