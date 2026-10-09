@@ -5,13 +5,23 @@ const jwt = require("jsonwebtoken");
 
 require("dotenv").config();
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
+
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(express.json());
 app.use(cors({
-  origin: "*",
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Origin is not allowed by CORS"));
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  credentials: false
 }));
 
 // call register in api folder 
@@ -52,7 +62,26 @@ app.get("/ping",(req,res)=>{
   res.json("pong")
 })
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.get("/health", async (req, res) => {
+  try {
+    await db.query("SELECT 1");
+    res.json({ status: "ok", database: "connected" });
+  } catch (err) {
+    console.error("Health check failed:", err.message);
+    res.status(503).json({ status: "unavailable", database: "disconnected" });
+  }
 });
+
+async function startServer() {
+  try {
+    await db.initializeDatabase();
+    app.listen(PORT, () => {
+      console.log(`Server listening on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to initialize the application:", err);
+    process.exit(1);
+  }
+}
+
+startServer();

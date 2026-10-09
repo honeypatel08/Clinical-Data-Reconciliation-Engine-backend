@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "install": "npm install --build-from-source sqlite3",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
@@ -13,7 +12,7 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   },
   "dependencies": {
     "@google/genai": "^1.45.0",
@@ -22,9 +21,7 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^8.0.2",
-    "pg": "^8.20.0",
-    "sqlite3": "^6.0.1"
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "jest": "^30.3.0",

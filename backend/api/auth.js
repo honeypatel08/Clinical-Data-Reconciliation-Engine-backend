@@ -8,13 +8,12 @@ const jwt = require("jsonwebtoken");
 
 router.post("/log-in", async (req, res) => {
   const { email, password } = req.body;
-  console.log("Received log in: ", req.body);
   if (!email || !password) {
     return res.status(400).json({ error: "Missing Login information!" });
   }
 
   try {
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email.toLowerCase()]);
     const user = result.rows[0];
 
     if (!user) {
@@ -35,7 +34,7 @@ router.post("/log-in", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
@@ -43,7 +42,7 @@ router.post("/log-in", async (req, res) => {
     res.json({
       token,
       role: user.role,
-      name: user.providerName
+      name: user.providername
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -54,7 +53,6 @@ router.post("/log-in", async (req, res) => {
 
 router.post("/register", async (req, res) => {
   const { providerName, email, password } = req.body;
-  console.log("Received body:", req.body);
 
   if (!providerName || !email || !password) {
     return res.status(400).json({
@@ -67,7 +65,7 @@ router.post("/register", async (req, res) => {
     await pool.query(
       `INSERT INTO users (providerName, email, password)
        VALUES ($1, $2, $3)`,
-      [providerName, email, hashedPassword]
+      [providerName, email.toLowerCase(), hashedPassword]
     );
 
     res.status(200).json({
